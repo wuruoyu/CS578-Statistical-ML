@@ -1,10 +1,15 @@
 from __future__ import division
+
 import sys
 import numpy as np
 import struct
 import gzip
 import random
 from metric import f1, accuracy
+
+from IPython import embed
+from multiprocessing import Pool
+
 
 class VanillaPerceptron():
     def __init__(self, training_set, learning_rate, epoch):
@@ -41,6 +46,7 @@ def read_mnist(filename):
 
 
 def main(argv):
+    print('Training with: ', argv)
     size_training = int(argv[0])
     epoch = int(argv[1])
     learning_rate = float(argv[2])
@@ -65,8 +71,10 @@ def main(argv):
     training_img, training_label = zip(*training_set)
 
     # scale [0, 255] to boolean
-    training_img = [[round(pixel/255) for pixel in sample] for sample in training_img]
-    testing_img = [[round(pixel/255) for pixel in sample] for sample in testing_img]
+    training_img = [[round(pixel / 255) for pixel in sample]
+                    for sample in training_img]
+    testing_img = [[round(pixel / 255) for pixel in sample]
+                   for sample in testing_img]
 
     # build 10 perceptron, one classifier for one digit
     perceptron_clfs = []
@@ -92,8 +100,7 @@ def main(argv):
         for clf in perceptron_clfs:
             scores.append(clf.predict(item[0]))
         predict_label.append(scores.index(max(scores)))
-    print("Train F1 score: ", f1(training_label, predict_label))
-    print("Train accuracy: ", accuracy(training_label, predict_label))
+    train_f1 = f1(training_label, predict_label)
 
     # test on testing set
     testing_set = zip(testing_img, testing_label)
@@ -104,8 +111,35 @@ def main(argv):
         for clf in perceptron_clfs:
             scores.append(clf.predict(item[0]))
         predict_label.append(scores.index(max(scores)))
-    print("Test F1 score: ", f1(testing_label, predict_label))
-    print("Test accuracy: ", accuracy(testing_label, predict_label))
+    test_f1 = f1(testing_label, predict_label)
+
+    print('train f1: ', train_f1, ' test_f1: ', test_f1)
+    return (train_f1, test_f1)
+
+
+def plot():
+    argvs = []
+    for rate in range(1, 5):
+        rate = 0.1 ** rate
+        argv = []
+        argv.append(10000)
+        argv.append(50)
+        argv.append(rate)
+        argv.append('data')
+        argvs.append(argv)
+
+    process_pool = Pool(10)
+    return process_pool.map(main, argvs)
+
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    output = plot()
+    import matplotlib.pyplot as plt
+    train_f1 = [item[0] for item in output]
+    test_f1 = [item[1] for item in output]
+    plt.plot(range(1, 5, 1), train_f1, 'g--', label="train")
+    plt.plot(range(1, 5, 1), test_f1, 'r--', label="test")
+    plt.axis([1, 4, 0.8, 1])
+    plt.show()
+    embed()
+

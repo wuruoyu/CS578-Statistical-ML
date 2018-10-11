@@ -1,4 +1,5 @@
 from __future__ import division
+
 import sys
 import numpy as np
 import struct
@@ -6,7 +7,10 @@ import gzip
 import random
 from metric import f1, accuracy
 
-class VanillaPerceptron():
+from IPython import embed
+from multiprocessing import Pool
+
+class AveragePerceptron():
     def __init__(self, training_set, learning_rate, epoch):
         self.training_set = training_set
         self.learning_rate = learning_rate
@@ -15,6 +19,10 @@ class VanillaPerceptron():
         # mnist specific
         self.weights = [0.0] * 28 * 28
         self.bias = 0
+
+        self.weights_average = [0.0] * 28 * 28
+        self.bias_average = 0
+        self.counter = 1
 
     def train(self):
         for _ in range(self.epoch):
@@ -26,7 +34,16 @@ class VanillaPerceptron():
                     for w_idx in range(len(self.weights)):
                         self.weights[
                             w_idx] += self.learning_rate * label * data[w_idx]
+                        self.weights_average[
+                            w_idx] += self.learning_rate * label * self.counter * data[
+                                w_idx]
                     self.bias += self.learning_rate * label
+                    self.bias_average += self.learning_rate * label * self.counter
+                self.counter += 1
+
+        for w_idx in range(len(self.weights)):
+            self.weights[w_idx] -= self.weights_average[w_idx] / self.counter
+        self.bias -= self.bias_average / self.counter
 
     def predict(self, data):
         activate = np.dot(self.weights, data) + self.bias
@@ -45,6 +62,7 @@ def main(argv):
     epoch = int(argv[1])
     learning_rate = float(argv[2])
     path = argv[3]
+    print('Training: ', argv)
 
     training_img_path = path + '/train-images-idx3-ubyte.gz'
     training_label_path = path + '/train-labels-idx1-ubyte.gz'
@@ -65,8 +83,10 @@ def main(argv):
     training_img, training_label = zip(*training_set)
 
     # scale [0, 255] to boolean
-    training_img = [[round(pixel/255) for pixel in sample] for sample in training_img]
-    testing_img = [[round(pixel/255) for pixel in sample] for sample in testing_img]
+    training_img = [[round(pixel / 255) for pixel in sample]
+                    for sample in training_img]
+    testing_img = [[round(pixel / 255) for pixel in sample]
+                   for sample in testing_img]
 
     # build 10 perceptron, one classifier for one digit
     perceptron_clfs = []
@@ -77,7 +97,7 @@ def main(argv):
         # pack together and shuffle
         local_training_set = zip(training_img, local_training_label)
         perceptron_clfs.append(
-            VanillaPerceptron(local_training_set, learning_rate, epoch))
+            AveragePerceptron(local_training_set, learning_rate, epoch))
 
     # training
     for clf in perceptron_clfs:
@@ -92,8 +112,7 @@ def main(argv):
         for clf in perceptron_clfs:
             scores.append(clf.predict(item[0]))
         predict_label.append(scores.index(max(scores)))
-    print("Train F1 score: ", f1(training_label, predict_label))
-    print("Train accuracy: ", accuracy(training_label, predict_label))
+    train_f1 = f1(training_label, predict_label)
 
     # test on testing set
     testing_set = zip(testing_img, testing_label)
@@ -104,8 +123,32 @@ def main(argv):
         for clf in perceptron_clfs:
             scores.append(clf.predict(item[0]))
         predict_label.append(scores.index(max(scores)))
-    print("Test F1 score: ", f1(testing_label, predict_label))
-    print("Test accuracy: ", accuracy(testing_label, predict_label))
+    test_f1 = f1(testing_label, predict_label)
+
+    return (train_f1, test_f1)
+
+def plot():
+    argvs = []
+    for epoch in range(10, 105, 5):
+        argv = []
+        argv.append(10000)
+        argv.append(epoch)
+        argv.append(0.001)
+        argv.append('data')
+        argvs.append(argv)
+
+    process_pool = Pool(10)
+    return process_pool.map(main, argvs)
+
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    output = plot()
+    import matplotlib.pyplot as plt
+    train_f1 = [item[0] for item in output]
+    test_f1 = [item[1] for item in output]
+    plt.plot(range(10, 105, 5), train_f1, 'g--', label="train")
+    plt.plot(range(10, 105, 5), test_f1, 'r--', label="test")
+    plt.axis([10, 100, 0.8, 1])
+    plt.show()
+    embed()
+

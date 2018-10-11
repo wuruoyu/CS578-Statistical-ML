@@ -6,31 +6,36 @@ import gzip
 import random
 from metric import f1, accuracy
 
-class VanillaPerceptron():
-    def __init__(self, training_set, learning_rate, epoch):
+from IPython import embed
+from multiprocessing import Pool
+
+class Winnow():
+    def __init__(self, training_set, factor, epoch):
         self.training_set = training_set
-        self.learning_rate = learning_rate
+        self.factor = factor 
         self.epoch = epoch
 
         # mnist specific
-        self.weights = [0.0] * 28 * 28
-        self.bias = 0
+        self.weights = [1.0] * 28 * 28
 
     def train(self):
         for _ in range(self.epoch):
             for idx in range(len(self.training_set)):
                 data = self.training_set[idx][0]
                 label = self.training_set[idx][1]
-                activate = np.dot(self.weights, data) + self.bias
-                if label * activate <= 0:
+                activate = np.dot(self.weights, data)
+                if activate < 1 and label > 0:
                     for w_idx in range(len(self.weights)):
-                        self.weights[
-                            w_idx] += self.learning_rate * label * data[w_idx]
-                    self.bias += self.learning_rate * label
+                        if data[w_idx] > 0:
+                            self.weights[w_idx] *= self.factor 
+                if activate >= 1 and label < 0:
+                    for w_idx in range(len(self.weights)):
+                        if data[w_idx] > 0:
+                            self.weights[w_idx] /= self.factor 
 
     def predict(self, data):
-        activate = np.dot(self.weights, data) + self.bias
-        return activate
+        activate = np.dot(self.weights, data) 
+        return activate 
 
 
 def read_mnist(filename):
@@ -77,7 +82,7 @@ def main(argv):
         # pack together and shuffle
         local_training_set = zip(training_img, local_training_label)
         perceptron_clfs.append(
-            VanillaPerceptron(local_training_set, learning_rate, epoch))
+            Winnow(local_training_set, learning_rate, epoch))
 
     # training
     for clf in perceptron_clfs:
@@ -92,8 +97,7 @@ def main(argv):
         for clf in perceptron_clfs:
             scores.append(clf.predict(item[0]))
         predict_label.append(scores.index(max(scores)))
-    print("Train F1 score: ", f1(training_label, predict_label))
-    print("Train accuracy: ", accuracy(training_label, predict_label))
+    train_f1 = f1(training_label, predict_label)
 
     # test on testing set
     testing_set = zip(testing_img, testing_label)
@@ -104,8 +108,32 @@ def main(argv):
         for clf in perceptron_clfs:
             scores.append(clf.predict(item[0]))
         predict_label.append(scores.index(max(scores)))
-    print("Test F1 score: ", f1(testing_label, predict_label))
-    print("Test accuracy: ", accuracy(testing_label, predict_label))
+    test_f1 = f1(testing_label, predict_label)
+
+    return (train_f1, test_f1)
+
+def plot():
+    argvs = []
+    for size in range(500, 10250, 250):
+        argv = []
+        argv.append(size)
+        argv.append(20)
+        argv.append(1.2)
+        argv.append('data')
+        argvs.append(argv)
+
+    process_pool = Pool(10)
+    return process_pool.map(main, argvs)
+
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    output = plot()
+    import matplotlib.pyplot as plt
+    train_f1 = [item[0] for item in output]
+    test_f1 = [item[1] for item in output]
+    plt.plot(range(500, 10250, 250), train_f1, 'g--', label="train")
+    plt.plot(range(500, 10250, 250), test_f1, 'r--', label="test")
+    plt.axis([500, 10000, 0.6, 1])
+    plt.show()
+    embed()
+

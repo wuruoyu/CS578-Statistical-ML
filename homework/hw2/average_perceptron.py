@@ -6,7 +6,8 @@ import gzip
 import random
 from metric import f1, accuracy
 
-class VanillaPerceptron():
+
+class AveragePerceptron():
     def __init__(self, training_set, learning_rate, epoch):
         self.training_set = training_set
         self.learning_rate = learning_rate
@@ -15,6 +16,10 @@ class VanillaPerceptron():
         # mnist specific
         self.weights = [0.0] * 28 * 28
         self.bias = 0
+
+        self.weights_average = [0.0] * 28 * 28
+        self.bias_average = 0
+        self.counter = 1
 
     def train(self):
         for _ in range(self.epoch):
@@ -26,7 +31,16 @@ class VanillaPerceptron():
                     for w_idx in range(len(self.weights)):
                         self.weights[
                             w_idx] += self.learning_rate * label * data[w_idx]
+                        self.weights_average[
+                            w_idx] += self.learning_rate * label * self.counter * data[
+                                w_idx]
                     self.bias += self.learning_rate * label
+                    self.bias_average += self.learning_rate * label * self.counter
+                self.counter += 1
+        
+        for w_idx in range(len(self.weights)):
+            self.weights[w_idx] -= self.weights_average[w_idx] / self.counter
+        self.bias -= self.bias_average / self.counter
 
     def predict(self, data):
         activate = np.dot(self.weights, data) + self.bias
@@ -65,8 +79,10 @@ def main(argv):
     training_img, training_label = zip(*training_set)
 
     # scale [0, 255] to boolean
-    training_img = [[round(pixel/255) for pixel in sample] for sample in training_img]
-    testing_img = [[round(pixel/255) for pixel in sample] for sample in testing_img]
+    training_img = [[round(pixel / 255) for pixel in sample]
+                    for sample in training_img]
+    testing_img = [[round(pixel / 255) for pixel in sample]
+                   for sample in testing_img]
 
     # build 10 perceptron, one classifier for one digit
     perceptron_clfs = []
@@ -77,7 +93,7 @@ def main(argv):
         # pack together and shuffle
         local_training_set = zip(training_img, local_training_label)
         perceptron_clfs.append(
-            VanillaPerceptron(local_training_set, learning_rate, epoch))
+            AveragePerceptron(local_training_set, learning_rate, epoch))
 
     # training
     for clf in perceptron_clfs:
@@ -106,6 +122,7 @@ def main(argv):
         predict_label.append(scores.index(max(scores)))
     print("Test F1 score: ", f1(testing_label, predict_label))
     print("Test accuracy: ", accuracy(testing_label, predict_label))
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
