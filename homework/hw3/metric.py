@@ -63,4 +63,16 @@ def f1(target, predict):
 
 
 def sigmoid(x):
-    return 1 / (1 + math.exp(-x))
+    try:
+        output = 1 / (1 + math.exp(-x))
+    except OverflowError:
+        output = 0
+    return output
+
+def mse(target, predict):
+    assert(len(target) == len(predict))
+    output = 0
+    for idx in range(len(target)):
+        output += (target[idx] - predict[idx]) ** 2
+    return output / len(target)
+
