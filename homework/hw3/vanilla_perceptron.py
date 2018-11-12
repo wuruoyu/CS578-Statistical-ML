@@ -5,6 +5,7 @@ import struct
 import gzip
 import random
 from metric import f1, accuracy
+from math import exp
 
 from IPython import embed
 
@@ -34,6 +35,48 @@ class VanillaPerceptron():
     def predict(self, data):
         activate = np.dot(self.weights, data) + self.bias
         return activate
+
+class BGD():
+    def __init__(self, training_set, learning_rate, regularization_rate, epoch, stop_step):
+        # split the training-set into training-set and validation-set
+        self.training_set = training_set[: len(training_set) * 0.8]
+        self.validation_set = training_set[len(training_set) * 0.8 :]
+        self.learning_rate = learning_rate
+        self.regularization_rate = regularization_rate
+        self.epoch = epoch
+        self.stop_step = stop_step
+
+        self.weights = [0.0] * (28 * 28 + 1)
+        self.acc_on_validation = []
+
+    def logistic(self, x):
+        return 1 / (1 + exp(-x))
+
+    def plot(self):
+        pass
+
+    def post_update(self):
+        pass
+
+    def train(self):
+        for step in range(self.epoch):
+            if step >= stop_step:
+                # not solved
+                # if acc_on_validation[-1] <= max(self.acc_on_validation[:-1])
+            w_gradient = [0.0] * len(self.weights)
+            for idx in range(len(self.training_set)):
+                data = self.training_set[idx][0]
+                label = self.training_set[idx][1]
+                for w_gradient_idx in range(len(w_gradient)):
+                    w_gradient[w_gradient_idx] += (self.logistic(self.weights, data) - label) * data[w_gradient_idx]
+            for w_gradient_idx in range(len(w_gradient)):
+                w_gradient[w_gradient_idx] /= len(self.training_set)
+                w_gradient[w_gradient_idx] += self.regularization_rate * self.weights[w_gradient_idx]
+                self.weights[w_gradient_idx] -= self.learning_rate * w_gradient[w_gradient_idx]
+            self.post_update()
+
+    def predict(self, data):
+        return self.logistic(np.dot(self.weights, data))
 
 
 def read_mnist(filename):
@@ -94,25 +137,25 @@ def main(argv):
     for sample in testing_img:
         sample.append(1)
 
-    # build 10 perceptron, one classifier for one digit
-    perceptron_clfs = []
+    # build 10 classifier, one classifier for one digit
+    clfs = []
     for target_label in range(10):
         local_training_label = [
             1 if label == target_label else -1 for label in training_label
         ]
         # pack together and shuffle
         local_training_set = zip(training_img, local_training_label)
-        perceptron_clfs.append(
-            VanillaPerceptron(local_training_set, learning_rate, epoch))
+        perceptron_clfs.append(BGD(local_training_set, learning_rate, epoch))
 
     # training
-    for clf in perceptron_clfs:
+    for clf in clfs:
         clf.train()
 
     # test on training set
     training_set = zip(training_img, training_label)
     predict_label = []
     for item in training_set:
+        item[0].append(1)
         # predict
         scores = []
         for clf in perceptron_clfs:
@@ -125,6 +168,7 @@ def main(argv):
     testing_set = zip(testing_img, testing_label)
     predict_label = []
     for item in testing_set:
+        item[0].append(1)
         # predict
         scores = []
         for clf in perceptron_clfs:
