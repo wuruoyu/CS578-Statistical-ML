@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from IPython import embed
 
 
-class BGD():
+class SGD():
     def __init__(self, training_set, is_regularization):
         self.training_set = training_set
 
@@ -20,6 +20,7 @@ class BGD():
         self.learning_rate = 0.01
         self.regularization_rate = 0.0001
         self.stop_step = 5
+        self.size_mini_batch = 100
 
         self.weights = [0.0] * (len(training_set[0][0]))
 
@@ -29,9 +30,11 @@ class BGD():
     def train(self):
         w_gradient = [0.0] * len(self.weights)
         # sum up gradient
-        for idx in range(len(self.training_set)):
-            data = self.training_set[idx][0]
-            label = self.training_set[idx][1]
+        mini_batch = random.sample(self.training_set, self.size_mini_batch)
+        # for idx in range(len(self.training_set)):
+        for sample in mini_batch:
+            data = sample[0]
+            label = sample[1]
             for w_gradient_idx in range(len(w_gradient)):
                 w_gradient[w_gradient_idx] += (sigmoid(
                     np.dot(self.weights, data)) - label) * data[w_gradient_idx]
@@ -51,9 +54,9 @@ class BGD():
             data = item[0]
             label = item[1]
             if label == 1:
-                error += log(self.predict(data))
+                error += log(sigmoid(np.dot(self.weights, data)))
             elif label == 0:
-                error += log(1 - self.predict(data))
+                error += log(1 - sigmoid(np.dot(self.weights, data)))
         return -error / len(self.training_set)
 
 
@@ -140,7 +143,7 @@ def main(argv):
         ]
         # pack together
         local_training_set = zip(training_img, local_training_label)
-        clfs.append(BGD(local_training_set, is_regularization))
+        clfs.append(SGD(local_training_set, is_regularization))
 
     # training
     acc_on_training = []
@@ -150,7 +153,6 @@ def main(argv):
     validation_set = zip(validation_img, validation_label)
     testing_set = zip(testing_img, testing_label)
     for step in range(max_step):
-        assert(len(acc_on_validation) == step)
         # stop criteria
         if step >= stop_step:
             if acc_on_validation[-1] <= max(
