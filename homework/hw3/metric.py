@@ -75,4 +75,3 @@ def mse(target, predict):
     for idx in range(len(target)):
         output += (target[idx] - predict[idx]) ** 2
     return output / len(target)
-
