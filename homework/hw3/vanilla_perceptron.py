@@ -4,7 +4,7 @@ import numpy as np
 import struct
 import gzip
 import random
-from metric import f1, accuracy, sigmoid
+from metric import f1, accuracy, sigmoid, mse
 from math import exp
 
 from IPython import embed
@@ -28,18 +28,19 @@ class BGD():
         pass
 
     def post_update(self):
-        # test on training set
+        # calculate the mse on validation_set
         predict_value = []
         for item in self.validation_set:
             predict_value.append(self.predict(item[0]))
+        target_value = [item[1] for item in self.validation_set]
+        self.mse_on_validation.append(mse(target_value, predict_value))
         embed()
-
-        # TODO
-        self.mse_on_validation.append(0)
+        self.plot()
 
     def train(self):
         for step in range(self.max_epoch):
             # stop criteria
+            assert(step == len(self.mse_on_validation))
             if step >= self.stop_step:
                 if mse_on_validation[-1] <= max(self.mse_on_validation[-1-self.stop_step : -1]):
                     break
