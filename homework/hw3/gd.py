@@ -6,22 +6,15 @@ import gzip
 import random
 from metric import f1, accuracy, sigmoid, mse
 from math import exp, log
-import matplotlib.pyplot as plt
-
-from IPython import embed
-
 
 class BGD():
     def __init__(self, training_set, is_regularization):
         self.training_set = training_set
+        self.weights = [0.0] * len(training_set[0][0])
 
-        # TODO: hyper-parameter
         self.is_regularization = is_regularization
         self.learning_rate = 0.01
         self.regularization_rate = 0.0001
-        self.stop_step = 5
-
-        self.weights = [0.0] * (len(training_set[0][0]))
 
     def plot(self):
         pass
@@ -32,15 +25,18 @@ class BGD():
         for idx in range(len(self.training_set)):
             data = self.training_set[idx][0]
             label = self.training_set[idx][1]
+            temp_diff = self.predict(data) - label
+            temp_gradient = np.multiply(data, temp_diff)
             for w_gradient_idx in range(len(w_gradient)):
-                w_gradient[w_gradient_idx] += (sigmoid(
-                    np.dot(self.weights, data)) - label) * data[w_gradient_idx]
+                w_gradient[w_gradient_idx] += temp_gradient[w_gradient_idx]
         # update weights
         for w_gradient_idx in range(len(w_gradient)):
             w_gradient[w_gradient_idx] /= len(self.training_set)
             if self.is_regularization:
-                w_gradient[w_gradient_idx] += self.regularization_rate * self.weights[w_gradient_idx]
-            self.weights[w_gradient_idx] -= self.learning_rate * w_gradient[w_gradient_idx]
+                w_gradient[w_gradient_idx] += self.regularization_rate * \
+                    self.weights[w_gradient_idx]
+            self.weights[w_gradient_idx] -= self.learning_rate * \
+                w_gradient[w_gradient_idx]
 
     def predict(self, data):
         return sigmoid(np.dot(self.weights, data))
@@ -85,8 +81,8 @@ def main(argv):
     # use first 10000 sample
     size_training = 8000
     size_validation = 2000
-    max_step = 500
-    stop_step = 5
+    max_step = 500 
+    early_stop = 5
 
     training_img_path = path + '/train-images-idx3-ubyte.gz'
     training_label_path = path + '/train-labels-idx1-ubyte.gz'
@@ -115,11 +111,11 @@ def main(argv):
         training_img = [[pixel / 255 for pixel in item]
                         for item in training_img]
         validation_img = [[pixel / 255 for pixel in item]
-                          for item in training_img]
+                          for item in validation_img]
         testing_img = [[pixel / 255 for pixel in item] for item in testing_img]
     elif type_feature == 'type2':
         training_img = [max_pooling(item) for item in training_img]
-        validation_img = [max_pooling(item) for item in training_img]
+        validation_img = [max_pooling(item) for item in validation_img]
         testing_img = [max_pooling(item) for item in testing_img]
     else:
         raise ValueError
@@ -149,14 +145,8 @@ def main(argv):
     training_set = zip(training_img, training_label)
     validation_set = zip(validation_img, validation_label)
     testing_set = zip(testing_img, testing_label)
+    validation_no_increase_counter = 0
     for step in range(max_step):
-        assert(len(acc_on_validation) == step)
-        # stop criteria
-        if step >= stop_step:
-            if acc_on_validation[-1] <= max(
-                    acc_on_validation[-1 - self.stop_step:-1]):
-                print("convergent!")
-                break
         for clf in clfs:
             clf.train()
 
@@ -165,16 +155,6 @@ def main(argv):
         for clf in clfs:
             training_loss += clf.training_loss()
         training_loss = training_loss / 10
-
-        # see acc on training set
-        predict_label = []
-        for item in training_set:
-            scores = []
-            for clf in clfs:
-                scores.append(clf.predict(item[0]))
-            predict_label.append(scores.index(max(scores)))
-        training_acc = accuracy(training_label, predict_label)
-        acc_on_training.append(training_acc)
 
         # push acc on validation set into the list
         predict_label = []
@@ -185,6 +165,26 @@ def main(argv):
             predict_label.append(scores.index(max(scores)))
         validation_acc = accuracy(training_label, predict_label)
         acc_on_validation.append(validation_acc)
+        
+        # stop criteria
+        if step != 0:
+            if acc_on_validation[-1] > acc_on_validation[-2]:
+                validation_no_increase_counter = 0
+            else:
+                validation_no_increase_counter += 1
+        if validation_no_increase_counter >= early_stop:
+            print("convergent!")
+            break
+
+        # see acc on training set
+        predict_label = []
+        for item in training_set:
+            scores = []
+            for clf in clfs:
+                scores.append(clf.predict(item[0]))
+            predict_label.append(scores.index(max(scores)))
+        training_acc = accuracy(training_label, predict_label)
+        acc_on_training.append(training_acc)
 
         # see acc on testing set
         predict_label = []
@@ -200,6 +200,9 @@ def main(argv):
         print("epoch ", step, ": ", "Training loss: ", training_loss,
               "Training Accuracy: ", training_acc, "Test Accuracy: ",
               testing_acc)
+
+    # plot
+    plot(acc_on_training, acc_on_testing)
 
 
 if __name__ == "__main__":

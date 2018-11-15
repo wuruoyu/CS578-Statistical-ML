@@ -6,28 +6,29 @@ import gzip
 import random
 from metric import f1, accuracy, sigmoid, mse
 from math import exp, log
+import matplotlib.pyplot as plt
+
+from IPython import embed
 
 
-class SGD():
+class BGD():
     def __init__(self, training_set, is_regularization):
         self.training_set = training_set
         self.weights = [0.0] * len(training_set[0][0])
 
         self.is_regularization = is_regularization
-        self.learning_rate = 0.01
+        self.learning_rate = 0.001
         self.regularization_rate = 0.0001
-        self.size_mini_batch = 100
 
     def plot(self):
         pass
 
     def train(self):
         w_gradient = [0.0] * len(self.weights)
-        mini_batch = random.sample(self.training_set, self.size_mini_batch)
         # sum up gradient
-        for sample in mini_batch:
-            data = sample[0]
-            label = sample[1]
+        for idx in range(len(self.training_set)):
+            data = self.training_set[idx][0]
+            label = self.training_set[idx][1]
             temp_diff = self.predict(data) - label
             temp_gradient = np.multiply(data, temp_diff)
             for w_gradient_idx in range(len(w_gradient)):
@@ -139,7 +140,7 @@ def main(argv):
         ]
         # pack together
         local_training_set = zip(training_img, local_training_label)
-        clfs.append(SGD(local_training_set, is_regularization))
+        clfs.append(BGD(local_training_set, is_regularization))
 
     # training
     acc_on_training = []
@@ -205,7 +206,8 @@ def main(argv):
               testing_acc)
 
     # plot
-    plot(acc_on_training, acc_on_testing)
+    embed()
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])

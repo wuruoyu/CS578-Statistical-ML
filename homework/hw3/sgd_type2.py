@@ -6,6 +6,9 @@ import gzip
 import random
 from metric import f1, accuracy, sigmoid, mse
 from math import exp, log
+import matplotlib.pyplot as plt
+
+from IPython import embed
 
 
 class SGD():
@@ -14,7 +17,7 @@ class SGD():
         self.weights = [0.0] * len(training_set[0][0])
 
         self.is_regularization = is_regularization
-        self.learning_rate = 0.01
+        self.learning_rate = 0.001
         self.regularization_rate = 0.0001
         self.size_mini_batch = 100
 
@@ -205,7 +208,8 @@ def main(argv):
               testing_acc)
 
     # plot
-    plot(acc_on_training, acc_on_testing)
+    embed()
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -66,7 +66,9 @@ def sigmoid(x):
     try:
         output = 1 / (1 + math.exp(-x))
     except OverflowError:
-        output = 0
+        output = 0.0000001
+    if output == 1:
+        output = 0.9999999
     return output
 
 def mse(target, predict):
