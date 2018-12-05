@@ -2,7 +2,9 @@ from __future__ import division
 import math
 import numpy as np
 from decisiontree import DT_Classifier
+from metric import accuracy
 
+from IPython import embed
 
 class ThresholdLearner():
     def __init__(self):
@@ -79,7 +81,7 @@ class Adaboost():
         self.distribution = len(self.feature) * [1 / len(self.feature)]
         for _ in range(round):
             # fitting
-            weak_learner = DT_Classifier(max_depth=1)
+            weak_learner = DT_Classifier(max_depth=0)
             weak_learner.fit(self.feature, self.label, self.distribution)
 
             # computing error
@@ -90,7 +92,7 @@ class Adaboost():
                     error += self.distribution[idx]
 
             self.weak_learner_list.append(weak_learner)
-            self.alphas.append(1/2 * np.log((1 - error) / error))
+            self.alphas.append(np.log((1 - error) / error) + np.log(9))
             self.redistribute()
             print("distribution", self.distribution)
             print("alpha: ", self.alphas[-1])
@@ -99,16 +101,15 @@ class Adaboost():
     def predict(self, feature):
         output = [0] * 10
         for learner_idx in range(len(self.weak_learner_list)):
-            output[self.weak_learner_list[learner_idx].predict(feature)] += self.alphas[learner_idx] 
+            output[int(self.weak_learner_list[learner_idx].predict([feature])[0])] += self.alphas[learner_idx] 
         return output.index(max(output))
 
     def redistribute(self):
         temp_distribution = []
         count = 0
         # redistribute
-        predict_label = self.predict(self.feature)
         for idx in range(len(self.feature)):
-            if predict_label[idx] == self.label[idx]:
+            if self.predict(self.feature[idx]) == self.label[idx]:
                 count += 1
                 temp_distribution.append(
                     self.distribution[idx] * math.e ** (-self.alphas[-1]))
@@ -130,11 +131,15 @@ def main():
     train_label = data[:3000, -1]
 
     test_feature = data[3000:, :-1]
-    test_label = data[3000:, : -1]
+    test_label = data[3000:, -1]
 
     adaboost = Adaboost(train_feature, train_label)
-    adaboost.train(100)
+    adaboost.train(3)
 
+    predict_label = []
+    for item in test_feature:
+        predict_label.append(adaboost.predict(item))
+    print("test accuracy: ", accuracy(predict_label, test_label))
 
 if __name__ == "__main__":
     main()
