@@ -1,6 +1,8 @@
 from __future__ import division
 import math
 import numpy as np
+from decisiontree import DT_Classifier
+
 
 class ThresholdLearner():
     def __init__(self):
@@ -12,10 +14,11 @@ class ThresholdLearner():
     def fit(self, feature, label, distribution):
         size_feature = len(feature[0])
         for feature_idx in range(size_feature):
-            min_val, max_val = self.find_feature_range(feature ,feature_idx)
+            min_val, max_val = self.find_feature_range(feature, feature_idx)
             for val in range(min_val, max_val):
                 for sign in (True, False):
-                    error = self.compute_error(feature, label, distribution, feature_idx, val, sign) 
+                    error = self.compute_error(
+                        feature, label, distribution, feature_idx, val, sign)
                     if self.error == None or self.error > error:
                         self.threshold_idx = feature_idx
                         self.threshold_val = val
@@ -42,7 +45,7 @@ class ThresholdLearner():
                     flag = True
                 elif label[sample_idx] == -1 and sign == False:
                     flag = True
-            if flag: 
+            if flag:
                 error += distribution[sample_idx]
         return error
 
@@ -62,12 +65,6 @@ class ThresholdLearner():
                 return -1
             return 1
 
-class DecisionStump():
-    def __init__(self):
-        pass
-
-    def fit(self):
-        pass
 
 class Adaboost():
     def __init__(self, feature, label):
@@ -79,35 +76,45 @@ class Adaboost():
         self.alphas = []
 
     def train(self, round):
-        self.distribution = len(self.feature) * [1 / len(self.feature)] 
+        self.distribution = len(self.feature) * [1 / len(self.feature)]
         for _ in range(round):
-            weak_learner = ThresholdLearner()
-            error = weak_learner.fit(self.feature, self.label, self.distribution)
+            # fitting
+            weak_learner = DT_Classifier(max_depth=1)
+            weak_learner.fit(self.feature, self.label, self.distribution)
+
+            # computing error
+            error = 0
+            predict_label = weak_learner.predict(self.feature)
+            for idx in range(len(predict_label)):
+                if predict_label[idx] != self.label[idx]:
+                    error += self.distribution[idx]
+
             self.weak_learner_list.append(weak_learner)
             self.alphas.append(1/2 * np.log((1 - error) / error))
             self.redistribute()
             print("distribution", self.distribution)
             print("alpha: ", self.alphas[-1])
+        print("training end")
 
-    def predict(self, item):
-        output = 0
+    def predict(self, feature):
+        output = [0] * 10
         for learner_idx in range(len(self.weak_learner_list)):
-            output += self.alphas[learner_idx] * self.weak_learner_list[learner_idx].predict(item)
-        if output > 0:
-            return 1
-        else:
-            return -1
+            output[self.weak_learner_list[learner_idx].predict(feature)] += self.alphas[learner_idx] 
+        return output.index(max(output))
 
     def redistribute(self):
         temp_distribution = []
         count = 0
         # redistribute
+        predict_label = self.predict(self.feature)
         for idx in range(len(self.feature)):
-            if self.predict(self.feature[idx]) == self.label[idx]:
+            if predict_label[idx] == self.label[idx]:
                 count += 1
-                temp_distribution.append(self.distribution[idx] * math.e ** (-self.alphas[-1]))
+                temp_distribution.append(
+                    self.distribution[idx] * math.e ** (-self.alphas[-1]))
             else:
-                temp_distribution.append(self.distribution[idx] * math.e ** (self.alphas[-1]))
+                temp_distribution.append(
+                    self.distribution[idx] * math.e ** (self.alphas[-1]))
         # normalize
         sum_temp = sum(temp_distribution)
         temp_distribution /= sum_temp
@@ -115,14 +122,19 @@ class Adaboost():
         self.distribution = temp_distribution
         print("accuracy: ", count / (len(self.feature)))
 
-def main():
-    data = np.genfromtxt(
-        # './winequality-white.csv', delimiter=';', dtype=float, skip_header=1)
-    feature = data[:, :-1]
-    label = data[:, -1]
 
-    adaboost = Adaboost(feature, label)
-    adaboost.train(2)
+def main():
+    data = np.genfromtxt('./winequality-white.csv',
+                         delimiter=';', dtype=float, skip_header=1)
+    train_feature = data[:3000, :-1]
+    train_label = data[:3000, -1]
+
+    test_feature = data[3000:, :-1]
+    test_label = data[3000:, : -1]
+
+    adaboost = Adaboost(train_feature, train_label)
+    adaboost.train(100)
+
 
 if __name__ == "__main__":
     main()
